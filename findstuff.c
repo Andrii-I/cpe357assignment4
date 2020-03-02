@@ -74,15 +74,25 @@ bool get_argument(char* line, int argn, char* result)
 	return 0;
 	}
 
-void main()
+char usage[] = "\nusage:\nfind <filename> [-s]\nfind <\"text\"> [-f:<file_ending>] [-s]\nkill <-pid>\nlist\nquit (q)\n\n";
+
+void findFilename(char* arg2, int sSet)
 {
-    char usage[] = "\nusage:\nfind <filename> [-s]\nfind <\"text\"> [-f:<file_ending>] [-s]\nkill <-pid>\nlist\nquit (q)\n\n";
+
+}
+
+void main()
+{   
+    int* kids = mmap(NULL, sizeof(pid_t)*10, PROT_READ | PROT_WRITE, MAP_SHARED | MAP_ANONYMOUS, -1, 0);
+    int* freeSpot = mmap(NULL, sizeof(int), PROT_READ | PROT_WRITE, MAP_SHARED | MAP_ANONYMOUS, -1, 0);
+    *freeSpot = 0;
+    
+    
+    
 
     while(1)
     {
-
         char* str_in = (char *)malloc(100);
-
 
         read(STDIN_FILENO, str_in, 100);
 
@@ -191,6 +201,18 @@ void main()
                     if (get_argument(str_in, 2, arg2) == 0)
                     {  
                         printf("find filename w/o -s\n");
+
+                        
+                        if (fork() == 0)
+                        {
+
+                        }
+                        else
+                        {
+                            wait(0);
+                        }
+                        
+
                     }
                     else if (strncmp(arg2, "-s\n", 3) == 0)
                     {
