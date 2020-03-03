@@ -8,7 +8,6 @@
 #include <sys/wait.h>
 #include <time.h>
 #include <sys/stat.h>
-#include <dirent.h>
 #include <string.h>
 #include <stdbool.h>
 
@@ -81,39 +80,44 @@ void findFilename(char* filename, bool sflag, int* kids)
     struct dirent* dent;
     struct stat st;
     DIR* dir;
-    char* buffer;
-    
-    strcpy(buffer, ".");
-    dir = opendir(buffer);
+    char mystring[500];
+    char* mybuffer = mystring;
+    strcpy(mybuffer, ".");
+    dir = opendir(mybuffer);
     int found = 0;
-
-    if (sflag == 0)
+    
+    char found_files[10000][500];
+    for (int i = 0; i < 10000; i++)
     {
+        found_files[i][0] = '\0';
+    }
+    int dirnum = 0;
+    char dirs[10000][500];
+ 
+
+
+
         for (dent = readdir(dir); dent != NULL; dent = readdir(dir))
         {
             stat(dent->d_name, &st);
-            if( S_ISDIR(st.st_mode) && 
+            if(S_ISREG(st.st_mode) && 
                 strcmp(((const char*)(&(dent->d_name))), filename) == 0  )
-            {
-                char* subfolder = (char*)malloc(500);
+            {               
+                char subfolder[500];
                 getcwd(subfolder, 500);
+                strcat(subfolder, "/");
                 strcat(subfolder, filename);
-                found = 1;
-    
-                chdir(subfolder);
-    
-                free(subfolder);
-                break;                                
+                printf("%s\n", subfolder);
+                found = 1;                            
             }
         }
         if (!found)
         {
-            printf("Folder does not exist\n");
+            printf(">nothing found<\n");
             fflush(0);
-        }
-        closedir(dir);
-    }
+        }        
 
+    closedir(dir);
 }
 
 void main()
@@ -128,9 +132,11 @@ void main()
 
     while(1)
     {
-        char* str_in = (char *)malloc(100);
+        //char* str_in = (char *)malloc(100);
 
-        read(STDIN_FILENO, str_in, 100);
+        //read(STDIN_FILENO, str_in, 100);
+
+        char* str_in = "find a.out\n";
 
         char t[100];
             
@@ -237,11 +243,17 @@ void main()
                     if (get_argument(str_in, 2, arg2) == 0)
                     {  
                         printf("find filename w/o -s\n");
-                        findFilename(arg2, 0, kids);
+/*                         for (int i = 0; arg1[i] != '\0'; i++)
+                        {
+                            printf("%c\n", arg1[i]);
+                        } */
+                        findFilename(arg1, 0, kids);
+                        printf("exited\n");
                     }
                     else if (strncmp(arg2, "-s\n", 3) == 0)
                     {
                         printf("find filename w -s\n");
+                        findFilename(arg1, 1, kids);
                     }
                     else
                     {
@@ -259,6 +271,7 @@ void main()
             printf("%s", usage);
         } 
 
-        free(str_in);
+        //free(str_in);
+        break;
     }     
 }
