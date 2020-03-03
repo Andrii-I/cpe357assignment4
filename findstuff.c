@@ -30,63 +30,99 @@
 //////////////////////////////////////////////////////////////////////
 bool get_argument(char* line, int argn, char* result)
 	{
-	//firstly: remove all spaces at the front
-	char temp[1000];
-	int start_space = 1;
-	for (int i = 0, u = 0; i <= strlen(line); i++)
-		if (line[i] == ' ' && start_space == 1) continue;
-		else 
-			{
-			temp[u++] = line[i]; 
-			start_space = 0;
-			}
-	//now remove an double or tripple spaces
-	char temp2[1000];
-	int space_on = 0;
-	for (int i = 0, u = 0; i <= strlen(temp); i++)
-		{
-		if (space_on == 1 && temp[i] == ' ') continue;
-		temp2[u++] = temp[i];
-		if (temp[i] == ' ') space_on = 1;
-		else space_on = 0;
-		}
-	//finally extract the arguments
-	int start, end;
-	start = end = 0;
-	int count = 0;
-	int quote = 0;
-	for (int i = 0; i <= strlen(temp2); i++)
-		if (temp2[i] == '\"') quote = !quote;
-		else if (quote == 0 &&(temp2[i] == ' ' || temp2[i] == 0))
-			{
-			end = i;
-			if (argn == count)
-				{
-				int length = end - start;
-				strncpy(result, temp2 + start, length);
-				result[length] = 0;
-                
-				return 1;
-				}
-			start = end + 1;
-			count++;
-			}
-	return 0;
+  	//firstly: remove all spaces at the front
+  	char temp[1000];
+  	int start_space = 1;
+  	for (int i = 0, u = 0; i <= strlen(line); i++)
+  		if (line[i] == ' ' && start_space == 1) continue;
+  		else 
+  			{
+  			temp[u++] = line[i]; 
+  			start_space = 0;
+  			}
+  	//now remove an double or tripple spaces
+  	char temp2[1000];
+  	int space_on = 0;
+  	for (int i = 0, u = 0; i <= strlen(temp); i++)
+  		{
+  		if (space_on == 1 && temp[i] == ' ') continue;
+  		temp2[u++] = temp[i];
+  		if (temp[i] == ' ') space_on = 1;
+  		else space_on = 0;
+  		}
+  	//finally extract the arguments
+  	int start, end;
+  	start = end = 0;
+  	int count = 0;
+  	int quote = 0;
+  	for (int i = 0; i <= strlen(temp2); i++)
+  		if (temp2[i] == '\"') quote = !quote;
+  		else if (quote == 0 &&(temp2[i] == ' ' || temp2[i] == 0))
+  			{
+  			end = i;
+  			if (argn == count)
+  				{
+  				int length = end - start;
+  				strncpy(result, temp2 + start, length);
+  				result[length] = 0;
+                  
+  				return 1;
+  				}
+  			start = end + 1;
+  			count++;
+  			}
+  	return 0;
 	}
 
 char usage[] = "\nusage:\nfind <filename> [-s]\nfind <\"text\"> [-f:<file_ending>] [-s]\nkill <-pid>\nlist\nquit (q)\n\n";
 
-void findFilename(char* arg2, int sSet)
+void findFilename(char* filename, bool sflag, int* kids)
 {
+    struct dirent* dent;
+    struct stat st;
+    DIR* dir;
+    char* buffer;
+    
+    strcpy(buffer, ".");
+    dir = opendir(buffer);
+    int found = 0;
+
+    if (sflag == 0)
+    {
+        for (dent = readdir(dir); dent != NULL; dent = readdir(dir))
+        {
+            stat(dent->d_name, &st);
+            if( S_ISDIR(st.st_mode) && 
+                strcmp(((const char*)(&(dent->d_name))), filename) == 0  )
+            {
+                char* subfolder = (char*)malloc(500);
+                getcwd(subfolder, 500);
+                strcat(subfolder, filename);
+                found = 1;
+    
+                chdir(subfolder);
+    
+                free(subfolder);
+                break;                                
+            }
+        }
+        if (!found)
+        {
+            printf("Folder does not exist\n");
+            fflush(0);
+        }
+        closedir(dir);
+    }
 
 }
 
 void main()
 {   
-    int* kids = mmap(NULL, sizeof(pid_t)*10, PROT_READ | PROT_WRITE, MAP_SHARED | MAP_ANONYMOUS, -1, 0);
-    int* freeSpot = mmap(NULL, sizeof(int), PROT_READ | PROT_WRITE, MAP_SHARED | MAP_ANONYMOUS, -1, 0);
-    *freeSpot = 0;
-    
+    int* kids = mmap(NULL, sizeof(int)*10, PROT_READ | PROT_WRITE, MAP_SHARED | MAP_ANONYMOUS, -1, 0);
+    for (int i = 0; i < 10; i++)
+    {
+        kids[i] = 0;
+    }
     
     
 
@@ -201,18 +237,7 @@ void main()
                     if (get_argument(str_in, 2, arg2) == 0)
                     {  
                         printf("find filename w/o -s\n");
-
-                        
-                        if (fork() == 0)
-                        {
-
-                        }
-                        else
-                        {
-                            wait(0);
-                        }
-                        
-
+                        findFilename(arg2, 0, kids);
                     }
                     else if (strncmp(arg2, "-s\n", 3) == 0)
                     {
