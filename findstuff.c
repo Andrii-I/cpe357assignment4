@@ -94,8 +94,7 @@ void findFilename(char* filename, bool sflag, int* kids)
     int dirnum = 0;
     char dirs[10000][500];
  
-
-
+    
 
         for (dent = readdir(dir); dent != NULL; dent = readdir(dir))
         {
@@ -109,6 +108,13 @@ void findFilename(char* filename, bool sflag, int* kids)
                 strcat(subfolder, filename);
                 printf("%s\n", subfolder);
                 found = 1;                            
+            }
+            if (sflag == 0 && S_ISDIR(st.st_mode) && 
+                strcmp(((const char*)(&(dent->d_name))), ".") != 0 &&
+                strcmp(((const char*)(&(dent->d_name))), "..") != 0) //change sflag to 1
+            {
+                //printf("sflag\n");
+                printf("dir %s\n", dent->d_name);
             }
         }
         if (!found)
