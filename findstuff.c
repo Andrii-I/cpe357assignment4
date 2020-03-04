@@ -148,7 +148,9 @@ int main()
     while (1)
         {
         int* input_rec = mmap(0,sizeof(int)*10,PROT_READ|PROT_WRITE,MAP_SHARED|MAP_ANONYMOUS,-1,0);
+        int* input_tried = mmap(0,sizeof(int)*10,PROT_READ|PROT_WRITE,MAP_SHARED|MAP_ANONYMOUS,-1,0);
         *input_rec = 0;
+        *input_tried = 0;
         printf("my prog$");
         fflush(0);
         dup2(save_stdin,STDIN_FILENO);
@@ -171,6 +173,7 @@ int main()
             {
             //int sleepcount = input[5]-48; //ASCII conversion
             *input_rec = 1;
+
             if (fork() == 0) //child process
                 {
                 char childreport[10000];
@@ -228,7 +231,7 @@ int main()
         else if (strncmp(input,"finr",4) == 0)
         {
             
-            *input_rec = 1;
+            *input_rec = *input_tried = 1;
             //int sleepcount = input[5]-48; //ASCII conversion
             if (fork() == 0) //child process
                 {
@@ -247,7 +250,7 @@ int main()
                 int kidnum=0;
                 for(int i=0;i<10;i++) if(childpids[i]==0) {childpids[i]=getpid();kidnum=i;break;}
                 //printf("kid %d sleeps for %d seconds to indicate a search\n",kidnum,sleepcount);
-                //sleep(sleepcount);
+                //sleep(10);
                 
                 //finding stuff here...
                 findFilesRecursively(mybuffer, filename, reportWIP, ((char *)(&found)), ((int *)(&first))); //change "aba.out"
@@ -274,13 +277,20 @@ int main()
                
                 return 0;
                 }
-        
         }
-        else if ()
+        else if ( get_argument(input, 0, arg0) == 1 && 
+                  get_argument(input, 1, arg1) == 0 &&
+                  ( strcmp(arg0,"quit") == 0 || strcmp(arg0,"q") == 0) ) 
         {
+            //ADD KILLING CHILDREN
+            for (int i = 0; childpids[i] != 0 || i < 10; i++)
+            {
+                kill(childpids[i], SIGKILL);
+            }
             
-        }
+            exit(0);
 
+        }
 
 /*         else if (*input_rec == 0)
         {
@@ -325,7 +335,7 @@ int main()
 
         printf("%s\n", input);
 
-        if (*input_rec == 0)
+        if (*input_rec == 0 && *input_tried == 1)
         {
             printf("\n%s\n", usage);
         }
