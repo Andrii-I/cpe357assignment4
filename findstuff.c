@@ -173,12 +173,13 @@ int main()
                     stat(dent->d_name, &st);
                     if(S_ISREG(st.st_mode) && strcmp(((const char*)(&(dent->d_name))), filename) == 0  )
                     {               
-                        sprintf(reportWIP,"\nkid %d is reporting!\n",kidnum);
+                        sprintf(reportWIP,"\n\nkid %d is reporting!\n",kidnum);
                         strcat(reportWIP,"found stuff:\n");
                         strncat(reportWIP, filename, sizeof(filename) - 1);
                         strcat(reportWIP, " in ");
                         strcat(reportWIP, mybuffer);
-                        strcat(reportWIP,"\n\n\0");
+                        strcat(reportWIP,"\n\n\n\0");
+                        fflush(0);
                         found = 1;              
                     }
                 }
@@ -186,6 +187,7 @@ int main()
                 {
                     sprintf(reportWIP,"\nkid %d is reporting!\n",kidnum);
                     strcat(reportWIP, ">File not found<\n\n\0");
+                    fflush(0);
                 }
 
                 
@@ -195,6 +197,7 @@ int main()
                 write(fd[1],childreport,strlen(childreport));
                 close(fd[1]); //close write  
                 kill(parentPid,SIGUSR1);
+                fflush(0);
                
                 return 0;
                 }
@@ -233,12 +236,14 @@ int main()
                     strcat(reportWIP2,"found stuff:\n");
                     strcat(reportWIP2, reportWIP);
                     strcat(reportWIP2,"\n\0");
+                    fflush(0);
             
                 }
                 else
                 {
                     sprintf(reportWIP2,"\n\nkid %d is reporting!\n",kidnum);
                     strcat(reportWIP2, ">File not found<\n\n\0");
+                    fflush(0);
                 }
             
                 close(fd[0]); //close read    
@@ -246,6 +251,7 @@ int main()
                 write(fd[1],childreport,strlen(childreport));
                 close(fd[1]); //close write  
                 kill(parentPid,SIGUSR1);
+                fflush(0);
                
                 return 0;
                 }
@@ -257,8 +263,9 @@ int main()
         //killing the kid for good:
         for(int i=0;i<10;i++) if(childpids[i]!=0)       waitpid(childpids[i],0,WNOHANG);
 
+        fflush(0);
         printf("input check: %s",input);
-       
+        fflush(0);
         }
     return 0;
     }

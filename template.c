@@ -76,7 +76,8 @@ int main()
         //killing the kid for good:
         for(int i=0;i<10;i++) if(childpids[i]!=0)       waitpid(childpids[i],0,WNOHANG);
 
-        printf("input check: %s",input);
+        //printf("input check: %s",input);
+        printf(" ");
        
         }
     return 0;
