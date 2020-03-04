@@ -1,32 +1,20 @@
+
+#include <time.h>
 #include <sys/types.h>
-#include <dirent.h>
 #include <signal.h>
+#include <dirent.h>
+#include <sys/stat.h>
 #include <unistd.h>
-#include <stdlib.h>
-#include <stdio.h>
+#include <stdio.h> 
+#include <string.h>
 #include <sys/mman.h>
 #include <sys/wait.h>
-#include <time.h>
-#include <sys/stat.h>
-#include <string.h>
+#include <stdlib.h>
 #include <stdbool.h>
 
-#define COLOR_BLUE "\x1b[34m"
-#define COLOR_RESET "\x1b[0m"
+int fd[2];
+char usage[] = "\nusage:\nfind <filename> [-s]\nfind <\"text\"> [-f:<file_ending>] [-s]\nkill <-pid>\nlist\nquit (q)\n\n";
 
-//////////////////////////////////////////////////////////////////////
-// get argument function
-//
-// return true if ok and false if error or no further argument
-// line .. the command line
-// argn .. the to extracted argument beginning with 0
-// result .. should be a static char array of 1000 bytes
-//
-// it respects quotation marks!!
-// its also not much tested
-// 
-// 
-//////////////////////////////////////////////////////////////////////
 bool get_argument(char* line, int argn, char* result)
 	{
   	//firstly: remove all spaces at the front
@@ -73,211 +61,204 @@ bool get_argument(char* line, int argn, char* result)
   	return 0;
 	}
 
-char usage[] = "\nusage:\nfind <filename> [-s]\nfind <\"text\"> [-f:<file_ending>] [-s]\nkill <-pid>\nlist\nquit (q)\n\n";
-
-void findFilename(char* filename, bool sflag, int* kids)
+void add_null_term(char *txt)
 {
-    struct dirent* dent;
-    struct stat st;
-    DIR* dir;
-    char mystring[500];
-    char* mybuffer = mystring;
-    strcpy(mybuffer, ".");
-    dir = opendir(mybuffer);
-    int found = 0;
-    
-    char found_files[10000][500];
-    for (int i = 0; i < 10000; i++)
+for(int i=0;i<100;i++)
+    if(txt[i]=='\n') {txt[i+1]=0;break;}
+}
+
+int overridemode=0;
+void myfct(int y)
     {
-        found_files[i][0] = '\0';
+    dup2(fd[0],STDIN_FILENO); //Overwrite userinput
+    overridemode=1;
     }
-    int dirnum = 0;
-    char dirs[10000][500];
- 
+
+void findFilesRecursively(char *basePath, char* filename, char* reportWIP, char* found, int* first)
+{
+    char path[1000];
+    struct dirent *dent;
+    struct stat st;
+    DIR *dir = opendir(basePath);
+
+    // Unable to open directory stream
+    if (!dir)
+        return;
+
     
 
-        for (dent = readdir(dir); dent != NULL; dent = readdir(dir))
+    while ((dent = readdir(dir)) != NULL)
+    {
+        if (strcmp(dent->d_name, ".") != 0 && strcmp(dent->d_name, "..") != 0)
         {
             stat(dent->d_name, &st);
-            if(S_ISREG(st.st_mode) && 
-                strcmp(((const char*)(&(dent->d_name))), filename) == 0  )
-            {               
-                char subfolder[500];
-                getcwd(subfolder, 500);
-                strcat(subfolder, "/");
-                strcat(subfolder, filename);
-                printf("%s\n", subfolder);
-                found = 1;                            
-            }
-            if (sflag == 0 && S_ISDIR(st.st_mode) && 
-                strcmp(((const char*)(&(dent->d_name))), ".") != 0 &&
-                strcmp(((const char*)(&(dent->d_name))), "..") != 0) //change sflag to 1
+            if ( S_ISREG(st.st_mode) && strcmp(((const char*)(&(dent->d_name))), filename) == 0 )
             {
-                //printf("sflag\n");
-                printf("dir %s\n", dent->d_name);
+                if (*first == 1)
+                {
+                    strncpy(reportWIP, filename, sizeof(filename) - 1);
+                    *first = 0;
+                }
+                else
+                {
+                    strncat(reportWIP, filename, sizeof(filename) - 1);
+                }
+                
+                strcat(reportWIP, " in ");
+                strcat(reportWIP, basePath);
+                strcat(reportWIP,"\n");
+                *found = 1;
             }
+
+            // Construct new path from our base path
+            strcpy(path, basePath);
+            strcat(path, "/");
+            strcat(path, dent->d_name);
+
+            findFilesRecursively(path, filename, reportWIP, found, first);
         }
-        if (!found)
-        {
-            printf(">nothing found<\n");
-            fflush(0);
-        }        
+    }
 
     closedir(dir);
 }
 
-void main()
-{   
-    int* kids = mmap(NULL, sizeof(int)*10, PROT_READ | PROT_WRITE, MAP_SHARED | MAP_ANONYMOUS, -1, 0);
-    for (int i = 0; i < 10; i++)
+int main()
     {
-        kids[i] = 0;
-    }
-    
-    
+  
+    int *childpids = mmap(0,sizeof(int)*10,PROT_READ|PROT_WRITE,MAP_SHARED|MAP_ANONYMOUS,-1,0);
+    for(int i=0;i<10;i++) childpids[i]=0;
 
-    while(1)
-    {
-        //char* str_in = (char *)malloc(100);
-
-        //read(STDIN_FILENO, str_in, 100);
-
-        char* str_in = "find a.out\n";
-
-        char t[100];
-            
-        if ( get_argument(str_in, 0, t) == 1 && 
-             get_argument(str_in, 1, t) == 0)
-        {           
-            char arg0[100];
-            get_argument(str_in, 0, arg0);
-            if ( (int)(arg0[strlen(arg0) - 1]) == 10 )
-            {
-                arg0[strlen(arg0) - 1] = '\0';
-            }
-            
-
-            if (strcmp(arg0, "quit") == 0 || strcmp(arg0, "q") == 0)  
-            {
-                printf("%s\n", "REMINDER: ADD QUIT SEQUENCE");
-                exit(0);
-            }
-            else if (strcmp(arg0, "list") == 0)
-            {
-                printf("LISTING\n"); //lists all running child processes and what they try to do. Also displays their serial number.
-            }
-            else 
-            {
-                printf("%s", usage);
-            } 
-        }
-        else if (get_argument(str_in, 0, t) == 1 && 
-                 strcmp(t, "kill") == 0 &&
-                 get_argument(str_in, 1, t) == 1 &&
-                 get_argument(str_in, 2, t) == 0 )
+    signal(SIGUSR1,myfct);
+    char input[1000];
+    int parentPid = getpid();
+    pipe(fd);
+    int save_stdin = dup(STDIN_FILENO);
+    while (1)
         {
-            char arg1[100];
-            get_argument(str_in, 1, arg1);
-            if ( (int)(arg1[strlen(arg1) - 1]) == 10 )
-            {
-                arg1[strlen(arg1) - 1] = '\0';
-            }
+        printf("my prog$");
+        fflush(0);
+        dup2(save_stdin,STDIN_FILENO);
+        overridemode=0;
+        read(STDIN_FILENO,input,1000);
+        if(overridemode==0)
+            add_null_term(input);//to get a NULL at the end of the string in case of a user input
 
-            if (arg1[0] == '-') 
+        if (strncmp(input,"find",4) == 0)
             {
-                printf("KILL THE CHILD\n"); //kill <num> kills a child process, and so ends its finding attemps
-            }
-            else
-            {
-                printf("%s", usage);
-            }           
-        }
-        else if (get_argument(str_in, 0, t) == 1 && 
-                 strcmp(t, "find") == 0 &&
-                 get_argument(str_in, 1, t) == 1)
-        {
-            char arg1[100];
-            if (get_argument(str_in, 1, arg1) == 1)
-            {
-                if ( (int)(arg1[strlen(arg1) - 1]) == 10 )
+            int sleepcount = input[5]-48; //ASCII conversion
+            if (fork() == 0) //child process
                 {
-                    arg1[strlen(arg1) - 1] = '\0';
+                char childreport[10000];
+                char reportWIP[10000];
+                //search for an empty spot in the child list
+                int kidnum=0;
+                for(int i=0;i<10;i++) if(childpids[i]==0) {childpids[i]=getpid();kidnum=i;break;}
+                //printf("kid %d sleeps for %d seconds to indicate a search\n",kidnum,sleepcount);
+                sleep(sleepcount);
+                //finding stuff here...
+
+                struct dirent* dent;
+                struct stat st;
+                DIR* dir;
+                char mystring[10000];
+                char* mybuffer = mystring;
+                getcwd(mybuffer, 10000);
+                dir = opendir(mybuffer);
+                int found = 0;
+
+                char* filename = "abba.out\0"; //TO DELETE
+
+                for (dent = readdir(dir); dent != NULL; dent = readdir(dir))
+                {
+                    stat(dent->d_name, &st);
+                    if(S_ISREG(st.st_mode) && strcmp(((const char*)(&(dent->d_name))), filename) == 0  )
+                    {               
+                        sprintf(reportWIP,"\nkid %d is reporting!\n",kidnum);
+                        strcat(reportWIP,"found stuff:\n");
+                        strncat(reportWIP, filename, sizeof(filename) - 1);
+                        strcat(reportWIP, " in ");
+                        strcat(reportWIP, mybuffer);
+                        strcat(reportWIP,"\n\n\0");
+                        found = 1;              
+                    }
                 }
+                if (found == 0)
+                {
+                    sprintf(reportWIP,"\nkid %d is reporting!\n",kidnum);
+                    strcat(reportWIP, ">File not found<\n\n\0");
+                }
+
                 
-                if (arg1[0] == '\"' && arg1[strlen(arg1) - 1] == '\"')
-                {
-                    char arg2[100];
-                    if (get_argument(str_in, 2, arg2) == 1)
-                    {
-                        if ( (int)(arg2[strlen(arg2) - 1]) == 10 )
-                        {
-                            arg2[strlen(arg2) - 1] = '\0';
-                        }
-
-                        if (strncmp(arg2, "-f:", 3) == 0)
-                        {
-                            char arg3[100];
-                            if (get_argument(str_in, 3, arg3) == 1 &&
-                                strncmp(arg3, "-s\n", 2) == 0)
-                            {
-                                printf("find \"text\" w -f:xyz w -s\n");
-                            }
-                            else if (get_argument(str_in, 3, arg3) == 0)
-                            {
-                                printf("find \"text\" w -f:xyz w/o -s\n");
-                            }
-                        }
-                        else if (strncmp(arg2, "-s\n", 3) == 0 && 
-                                 get_argument(str_in, 3, t) == 0)
-                        {
-                            printf("find \"text\" w -s\n");
-                        }
-                        else
-                        {
-                            printf("%s", usage);
-                        }
-                        
-                    }
-                    else if (get_argument(str_in, 2, t) == 0)
-                    {
-                        printf("find \"text\" w/o -f:xyz or -s\n");
-                    }
+                //finding done.                       
+                close(fd[0]); //close read    
+                strcpy(childreport, reportWIP);        
+                write(fd[1],childreport,strlen(childreport));
+                close(fd[1]); //close write  
+                kill(parentPid,SIGUSR1);
+               
+                return 0;
                 }
-                else 
-                {
-                    char arg2[100];
-                    if (get_argument(str_in, 2, arg2) == 0)
-                    {  
-                        printf("find filename w/o -s\n");
-/*                         for (int i = 0; arg1[i] != '\0'; i++)
-                        {
-                            printf("%c\n", arg1[i]);
-                        } */
-                        findFilename(arg1, 0, kids);
-                        printf("exited\n");
-                    }
-                    else if (strncmp(arg2, "-s\n", 3) == 0)
-                    {
-                        printf("find filename w -s\n");
-                        findFilename(arg1, 1, kids);
-                    }
-                    else
-                    {
-                        printf("%s", usage);
-                    }
-                }
+           
             }
-            else
-            {
-                printf("%s", usage);
-            }
-        }
-        else 
+        else if (strncmp(input,"finr",4) == 0)
         {
-            printf("%s", usage);
-        } 
+            {
+            int sleepcount = input[5]-48; //ASCII conversion
+            if (fork() == 0) //child process
+                {
+                char reportWIP[10000];
+                char reportWIP2[10000];
+                char childreport[10000];
+                char mystring[10000];
+                char* mybuffer = mystring;
+                getcwd(mybuffer, 10000);
+                int found = 0; 
+                int first = 1; 
 
-        //free(str_in);
-        break;
-    }     
-}
+                char* filename = "a.out"; //TO DELETE
+
+                //search for an empty spot in the child list
+                int kidnum=0;
+                for(int i=0;i<10;i++) if(childpids[i]==0) {childpids[i]=getpid();kidnum=i;break;}
+                //printf("kid %d sleeps for %d seconds to indicate a search\n",kidnum,sleepcount);
+                sleep(sleepcount);
+                
+                //finding stuff here...
+                findFilesRecursively(mybuffer, filename, reportWIP, ((char *)(&found)), ((int *)(&first))); //change "aba.out"
+                
+                //finding done.
+                if (found == 1)
+                {
+                    sprintf(reportWIP2,"\n\nkid %d is reporting!\n",kidnum);
+                    strcat(reportWIP2,"found stuff:\n");
+                    strcat(reportWIP2, reportWIP);
+                    strcat(reportWIP2,"\n\0");
+            
+                }
+                else
+                {
+                    sprintf(reportWIP2,"\n\nkid %d is reporting!\n",kidnum);
+                    strcat(reportWIP2, ">File not found<\n\n\0");
+                }
+            
+                close(fd[0]); //close read    
+                strcpy(childreport, reportWIP2);        
+                write(fd[1],childreport,strlen(childreport));
+                close(fd[1]); //close write  
+                kill(parentPid,SIGUSR1);
+               
+                return 0;
+                }
+            }
+
+        }
+        
+        
+        //killing the kid for good:
+        for(int i=0;i<10;i++) if(childpids[i]!=0)       waitpid(childpids[i],0,WNOHANG);
+
+        printf("input check: %s",input);
+       
+        }
+    return 0;
+    }
