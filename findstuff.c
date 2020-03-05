@@ -10,6 +10,9 @@
 #include <sys/wait.h>
 #include <stdlib.h>
 #include <stdbool.h>
+#include <time.h>
+#include <sys/time.h>
+
 
 int fd[2];
 char usage[] = "\nusage:\nfind <filename> [-s]\nfind <\"text\"> [-f:<file_ending>] [-s]\nkill <-pid>\nlist\nquit (q)\n\n\0";
@@ -172,6 +175,9 @@ int main()
             //int sleepcount = input[5]-48; //ASCII conversion
             if (fork() == 0) //child process
                 {
+                struct timeval tval_before, tval_after, tval_result;
+                gettimeofday(&tval_before, NULL);
+                
                 char childreport[10000];
                 char reportWIP[10000];
                 //search for an empty spot in the child list
@@ -180,6 +186,7 @@ int main()
                 //printf("kid %d sleeps for %d seconds to indicate a search\n",kidnum,sleepcount);
                 //sleep(sleepcount);
                 //finding stuff here...
+                sleep(5);
 
                 struct dirent* dent;
                 struct stat st;
@@ -202,16 +209,28 @@ int main()
                         strcat(reportWIP, filename);
                         strcat(reportWIP, " in ");
                         strcat(reportWIP, mybuffer);
-                        strcat(reportWIP,"\n\n\0");
+                        strcat(reportWIP,"\n");
                         found = 1;              
                     }
                 }
                 if (found == 0)
                 {
                     sprintf(reportWIP,"\n\nkid %d is reporting!\n",kidnum);
-                    strcat(reportWIP, ">File not found<\n\0");
+                    strcat(reportWIP, ">File not found<\n");
                 }
 
+                gettimeofday(&tval_after, NULL);
+                timersub(&tval_after, &tval_before, &tval_result);
+                int sec, h, m, s;
+                sec = tval_result.tv_sec;
+                h = (sec/3600); 
+                m = (sec -(3600*h))/60;
+                s = (sec -(3600*h)-(m*60));
+
+                char time_taken[1000];
+                sprintf(time_taken,"Time taken: %i:%i:%i:%ld", h, m, s, (long int)tval_result.tv_usec/1000);
+                strcat(time_taken, "\n\0");
+                strcat(reportWIP, time_taken);
                 
                 //finding done.                       
                 close(fd[0]); //close read    
@@ -229,6 +248,9 @@ int main()
             //int sleepcount = input[5]-48; //ASCII conversion
             if (fork() == 0) //child process
                 {
+                struct timeval tval_before, tval_after, tval_result;
+                gettimeofday(&tval_before, NULL);
+
                 char reportWIP[10000];
                 char reportWIP2[10000];
                 char childreport[10000];
@@ -244,7 +266,7 @@ int main()
                 int kidnum=0;
                 for(int i=0;i<10;i++) if(childpids[i]==0) {childpids[i]=getpid();kidnum=i; childoccupations[kidnum] = 1; break;}
                 //printf("kid %d sleeps for %d seconds to indicate a search\n",kidnum,sleepcount);
-                sleep(10);
+                //sleep(10);
                 
                 //finding stuff here...
                 findFilesRecursively(mybuffer, filename, reportWIP, ((char *)(&found)), ((int *)(&first))); //change "aba.out"
@@ -255,13 +277,26 @@ int main()
                     sprintf(reportWIP2,"\n\nkid %d is reporting!\n",kidnum);
                     strcat(reportWIP2,"found stuff:\n");
                     strcat(reportWIP2, reportWIP);
-                    strcat(reportWIP2,"\n\0");
+                    strcat(reportWIP2,"\n");
                 }
                 else
                 {
                     sprintf(reportWIP2,"\n\nkid %d is reporting!\n",kidnum);
-                    strcat(reportWIP2, ">File not found<\n\n\0");
+                    strcat(reportWIP2, ">File not found<\n");
                 }
+
+                gettimeofday(&tval_after, NULL);
+                timersub(&tval_after, &tval_before, &tval_result);
+                int sec, h, m, s;
+                sec = tval_result.tv_sec;
+                h = (sec/3600); 
+                m = (sec -(3600*h))/60;
+                s = (sec -(3600*h)-(m*60));
+
+                char time_taken[1000];
+                sprintf(time_taken,"Time taken: %i:%i:%i:%ld", h, m, s, (long int)tval_result.tv_usec/1000);
+                strcat(time_taken, "\n\0");
+                strcat(reportWIP2, time_taken);
             
                 close(fd[0]); //close read    
                 strcpy(childreport, reportWIP2);        
