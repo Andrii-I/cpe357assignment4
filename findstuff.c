@@ -15,7 +15,7 @@
 
 
 int fd[2];
-char usage[] = "\nusage:\nfind <filename> [-s]\nfind <\"text\"> [-f:<file_ending>] [-s]\nkill <-pid>\nlist\nquit (q)\n\n\0";
+char usage[] = "\nusage:\nfind <filename> [-s]\nfind <\"text\"> [-f:<file_ending>] [-s]\nkill <childnumber>\nlist\nquit (or q)\n\n\0";
 
 int get_argument(char* line, int argn, char* result)
 {
@@ -140,10 +140,11 @@ void findFilesRecursively(char *basePath, char* filename, char* reportWIP, char*
 int main()
     {  
     int *childpids = mmap(0,sizeof(int)*10,PROT_READ|PROT_WRITE,MAP_SHARED|MAP_ANONYMOUS,-1,0);
-    int *childoccupations = mmap(0,sizeof(int)*10,PROT_READ|PROT_WRITE,MAP_SHARED|MAP_ANONYMOUS,-1,0);
-    const char* const occ_list[] = { "tries to find a file non-recursively", "tries to find a file recursively" }; 
-    
     for(int i=0;i<10;i++) childpids[i]=0;
+
+    //int *childoccupations = mmap(0,sizeof(struct occupation)*10,PROT_READ|PROT_WRITE,MAP_SHARED|MAP_ANONYMOUS,-1,0);
+    char (*childoccupations)[10]; 
+    childoccupations = mmap(0,10*1000,PROT_READ | PROT_WRITE,MAP_SHARED | MAP_ANON,-1,0);
 
     signal(SIGUSR1,myfct);
     char input[1000];
@@ -182,11 +183,11 @@ int main()
                 char reportWIP[10000];
                 //search for an empty spot in the child list
                 int kidnum=0;
-                for(int i=0;i<10;i++) if(childpids[i]==0) {childpids[i]=getpid();kidnum=i; childoccupations[kidnum] = 0; break;}
+                for(int i=0;i<10;i++) if(childpids[i]==0) {childpids[i]=getpid();kidnum=i; strcpy(childoccupations[kidnum], input) ; break;}
                 //printf("kid %d sleeps for %d seconds to indicate a search\n",kidnum,sleepcount);
                 //sleep(sleepcount);
                 //finding stuff here...
-                sleep(5);
+                //sleep(15);
 
                 struct dirent* dent;
                 struct stat st;
@@ -243,7 +244,13 @@ int main()
                 }
            
             }
-        else if (strncmp(input,"finr",4) == 0)
+        else if ( get_argument(input, 0, arg0) == 1 && 
+                  get_argument(input, 1, arg1) == 1 &&
+                  get_argument(input, 2, arg2) == 1 &&
+                  get_argument(input, 3, arg3) == 0 &&
+                  strcmp(arg0, "find") == 0 &&
+                  strcmp(arg2, "-s") == 0)
+        //else if (strncmp(input,"finr",4) == 0)
         {
             //int sleepcount = input[5]-48; //ASCII conversion
             if (fork() == 0) //child process
@@ -260,11 +267,11 @@ int main()
                 int found = 0; 
                 int first = 1; 
 
-                char* filename = "a.out"; //TO DELETE
+                char* filename = arg1; //TO DELETE
 
                 //search for an empty spot in the child list
                 int kidnum=0;
-                for(int i=0;i<10;i++) if(childpids[i]==0) {childpids[i]=getpid();kidnum=i; childoccupations[kidnum] = 1; break;}
+                for(int i=0;i<10;i++) if(childpids[i]==0) {childpids[i]=getpid();kidnum=i; strcpy(childoccupations[kidnum], input); break;}
                 //printf("kid %d sleeps for %d seconds to indicate a search\n",kidnum,sleepcount);
                 //sleep(10);
                 
@@ -314,7 +321,7 @@ int main()
             printf("\n\nActive children:\n");
             for (int i = 0; childpids[i] != 0; i++)
             {
-                printf("Child %i: %s\n", i, occ_list[childoccupations[i]] );
+                printf("Child number %i; trying to: %s\n", i, childoccupations[i]);
             }
             printf("\n");
 
