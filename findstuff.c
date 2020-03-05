@@ -1,4 +1,3 @@
-
 #include <time.h>
 #include <sys/types.h>
 #include <signal.h>
@@ -138,6 +137,9 @@ void findFilesRecursively(char *basePath, char* filename, char* reportWIP, char*
 int main()
     {  
     int *childpids = mmap(0,sizeof(int)*10,PROT_READ|PROT_WRITE,MAP_SHARED|MAP_ANONYMOUS,-1,0);
+    int *childoccupations = mmap(0,sizeof(int)*10,PROT_READ|PROT_WRITE,MAP_SHARED|MAP_ANONYMOUS,-1,0);
+    const char* const occ_list[] = { "tries to find a file non-recursively", "tries to find a file recursively" }; 
+    
     for(int i=0;i<10;i++) childpids[i]=0;
 
     signal(SIGUSR1,myfct);
@@ -147,10 +149,6 @@ int main()
     int save_stdin = dup(STDIN_FILENO);
     while (1)
         {
-        int* input_rec = mmap(0,sizeof(int)*10,PROT_READ|PROT_WRITE,MAP_SHARED|MAP_ANONYMOUS,-1,0);
-        int* input_tried = mmap(0,sizeof(int)*10,PROT_READ|PROT_WRITE,MAP_SHARED|MAP_ANONYMOUS,-1,0);
-        *input_rec = 0;
-        *input_tried = 0;
         printf("my prog$");
         fflush(0);
         dup2(save_stdin,STDIN_FILENO);
@@ -172,15 +170,13 @@ int main()
         //if (strncmp(input,"find",4) == 0)
             {
             //int sleepcount = input[5]-48; //ASCII conversion
-            *input_rec = 1;
-
             if (fork() == 0) //child process
                 {
                 char childreport[10000];
                 char reportWIP[10000];
                 //search for an empty spot in the child list
                 int kidnum=0;
-                for(int i=0;i<10;i++) if(childpids[i]==0) {childpids[i]=getpid();kidnum=i;break;}
+                for(int i=0;i<10;i++) if(childpids[i]==0) {childpids[i]=getpid();kidnum=i; childoccupations[kidnum] = 0; break;}
                 //printf("kid %d sleeps for %d seconds to indicate a search\n",kidnum,sleepcount);
                 //sleep(sleepcount);
                 //finding stuff here...
@@ -230,8 +226,6 @@ int main()
             }
         else if (strncmp(input,"finr",4) == 0)
         {
-            
-            *input_rec = *input_tried = 1;
             //int sleepcount = input[5]-48; //ASCII conversion
             if (fork() == 0) //child process
                 {
@@ -248,9 +242,9 @@ int main()
 
                 //search for an empty spot in the child list
                 int kidnum=0;
-                for(int i=0;i<10;i++) if(childpids[i]==0) {childpids[i]=getpid();kidnum=i;break;}
+                for(int i=0;i<10;i++) if(childpids[i]==0) {childpids[i]=getpid();kidnum=i; childoccupations[kidnum] = 1; break;}
                 //printf("kid %d sleeps for %d seconds to indicate a search\n",kidnum,sleepcount);
-                //sleep(10);
+                sleep(10);
                 
                 //finding stuff here...
                 findFilesRecursively(mybuffer, filename, reportWIP, ((char *)(&found)), ((int *)(&first))); //change "aba.out"
@@ -280,53 +274,49 @@ int main()
         }
         else if ( get_argument(input, 0, arg0) == 1 && 
                   get_argument(input, 1, arg1) == 0 &&
+                  strcmp(arg0,"list") == 0 ) 
+        {
+            printf("\n\nActive children:\n");
+            for (int i = 0; childpids[i] != 0; i++)
+            {
+                printf("Child %i: %s\n", i, occ_list[childoccupations[i]] );
+            }
+            printf("\n");
+
+        }
+        else if ( get_argument(input, 0, arg0) == 1 && 
+                  get_argument(input, 1, arg1) == 0 &&
                   ( strcmp(arg0,"quit") == 0 || strcmp(arg0,"q") == 0) ) 
         {
-            //ADD KILLING CHILDREN
-            for (int i = 0; childpids[i] != 0 || i < 10; i++)
+            for (int i = 0; childpids[i] != 0 && i < 10; i++)
             {
                 kill(childpids[i], SIGKILL);
             }
             
             exit(0);
-
         }
-
-/*         else if (*input_rec == 0)
+        else if ( get_argument(input, 0, arg0) == 1 && 
+                  get_argument(input, 1, arg1) == 1 &&
+                  get_argument(input, 2, arg2) == 0 &&
+                  strcmp(arg0,"kill") == 0 ) 
         {
-        
-            //int sleepcount = input[5]-48; //ASCII conversion
-            if (fork() == 0) //child process
-                {
-                char reportWIP[10000];
-                char reportWIP2[10000];
-                char childreport[10000];
-                char mystring[10000];
-                char* mybuffer = mystring;
-                getcwd(mybuffer, 10000);
-                int found = 0; 
-                int first = 1; 
 
-                //search for an empty spot in the child list
-                int kidnum=0;
-                for(int i=0;i<10;i++) if(childpids[i]==0) {childpids[i]=getpid();kidnum=i;break;}
-                //printf("kid %d sleeps for %d seconds to indicate a search\n",kidnum,sleepcount);
-
-                strcpy(reportWIP2, usage);
+            if ( ( ( (int) (arg1[0]) ) - 48 >= 0 || ( (int) (arg1[0]) ) - 48 <= 9 ) &&  childpids[ ( (int) (arg1[0]) ) - 48 ] != 0)
+            {
+                kill(childpids[ ( (int) (arg1[0]) ) - 48 ], SIGKILL);
+                childpids[ ( (int) (arg1[0]) ) - 48 ] = 0;
+                printf("\nChild %i killed\n", (int) (arg1[0] - 48));
+            }
+            else
+            {
+                printf("\nChild %s does not exist\n", arg1);
+            }
             
-                close(fd[0]); //close read    
-                strcpy(childreport, reportWIP2);        
-                write(fd[1],childreport,strlen(childreport));
-                close(fd[1]); //close write  
-                kill(parentPid,SIGUSR1);
-               
-                return 0;
-                }
-        
-        }  */
-        
-
-        
+        }
+        else if (overridemode == 0)
+        {
+            printf("\n%s\n", usage); 
+        }
 
         
         
@@ -335,10 +325,10 @@ int main()
 
         printf("%s\n", input);
 
-        if (*input_rec == 0 && *input_tried == 1)
+/*         if (*input_rec == 0 && *input_tried == 1)
         {
             printf("\n%s\n", usage);
-        }
+        } */
 
         }
     return 0;
