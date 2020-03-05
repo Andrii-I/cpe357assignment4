@@ -384,6 +384,137 @@ int main()
                 }
 
         }
+
+        //FIND "STRING" with .txt flag
+        else if ( get_argument(input, 0, arg0) == 1 && 
+             get_argument(input, 1, arg1) == 1 &&
+             get_argument(input, 2, arg2) == 1 &&
+             get_argument(input, 3, arg3) == 0 &&
+             strcmp(arg0,"find") == 0 &&
+             arg1[0] == '\"' && arg1[strlen(arg1)-1] == '\"')
+        {
+            //int sleepcount = input[5]-48; //ASCII conversion
+            int len = strlen(arg1);
+            memmove(arg1, arg1 + 1, len - 2);
+            arg1[len-2] = 0;
+
+            int len2 = strlen(arg2);
+            memmove(arg2, arg2 + 3, len2);
+
+            if (fork() == 0) //child process
+                {
+                struct timeval tval_before, tval_after, tval_result;
+                gettimeofday(&tval_before, NULL);
+                
+                char childreport[10000];
+                //search for an empty spot in the child list
+                int kidnum=0;
+                for(int i=0;i<10;i++) if(childpids[i]==0) {childpids[i]=getpid();kidnum=i; strcpy(childoccupations[kidnum], input) ; break;}
+                //printf("kid %d sleeps for %d seconds to indicate a search\n",kidnum,sleepcount);
+                //sleep(sleepcount);
+                //finding stuff here...
+                //sleep(15);
+            
+                FILE *fptr;
+                int flag;
+            
+                struct dirent* dent;
+                struct stat st;
+                DIR* dir;
+                char mystring[10000];
+                char* mybuffer = mystring;
+                getcwd(mybuffer, 10000);
+                dir = opendir(mybuffer);
+                int found = 0; 
+            
+                char reportWIP2[1000];
+            
+                sprintf(reportWIP2,"\nKid %i reporting!\n", kidnum);
+
+                char* word = arg1;
+
+                for (dent = readdir(dir); dent != NULL; dent = readdir(dir))
+                {               
+                    int dot = -1;
+                    for (int i = 0; i < strlen(dent->d_name); i++)
+                    {
+                        if (dent->d_name[i] == '.')
+                        {
+                            dot = i;
+                        }
+                    }
+                
+                    char temp[1000];
+                    if ( strcmp(arg2, dent->d_name + dot + 1) == 0)
+                    {
+                        stat(dent->d_name, &st);
+                        if(S_ISREG(st.st_mode))
+                        {            
+                            FILE *ptr;
+                
+                            char path[1000];
+                            getcwd(path, 1000); 
+                            strcat(path, "/");
+                            strcat(path, dent->d_name);
+                
+                            /* Try to open file */
+                            fptr = fopen(dent->d_name, "r");
+                        
+                            /* Exit if file not opened successfully */
+                            if (fptr == NULL)
+                            {
+                                continue;
+                            }
+                        
+                        
+                            // Find index of word in fptr
+                            findStr(fptr, word, &flag, &found);
+                        
+                            if (flag != -1)
+                            {
+                                strcat(reportWIP2, word);
+                                strcat(reportWIP2," is found at");
+                                strcat(reportWIP2, path);
+                                strcat(reportWIP2,"\n");
+                            }      
+                        
+                            // Close file
+                            fclose(fptr);
+                        }
+                        
+                    }
+                }
+             
+                if (found == 0)
+                {
+                    strcat(reportWIP2, ">File not found<\n");
+                }
+
+                gettimeofday(&tval_after, NULL);
+                timersub(&tval_after, &tval_before, &tval_result);
+                int sec, h, m, s;
+                sec = tval_result.tv_sec;
+                h = (sec/3600); 
+                m = (sec -(3600*h))/60;
+                s = (sec -(3600*h)-(m*60));
+
+                char time_taken[1000];
+                sprintf(time_taken,"Time taken: %i:%i:%i:%ld", h, m, s, (long int)tval_result.tv_usec/1000);
+                strcat(time_taken, "\n\0");
+                strcat(reportWIP2, time_taken);
+                
+                //finding done.                       
+                close(fd[0]); //close read    
+                strcpy(childreport, reportWIP2);        
+                write(fd[1],childreport,strlen(childreport));
+                close(fd[1]); //close write  
+                kill(parentPid,SIGUSR1);
+               
+                return 0;
+                }
+                
+
+        }
         
         else if ( get_argument(input, 0, arg0) == 1 && 
                   get_argument(input, 1, arg1) == 1 &&
