@@ -139,6 +139,8 @@ void findFilesRecursively(char *basePath, char* filename, char* reportWIP, char*
     closedir(dir);
 }
 
+
+
 int findStr(FILE *fptr, const char *word, int *flag, int* found)
 {
     char str[1000];
@@ -163,6 +165,73 @@ int findStr(FILE *fptr, const char *word, int *flag, int* found)
     }
 
     return *flag;
+}
+
+void findTextRecursively(char *basePath, char* filename, char* reportWIP2, int* found, int* first)
+{
+    char path[1000];
+    struct dirent *dent;
+    struct stat st;
+    DIR *dir = opendir(basePath);
+    FILE *fptr;
+    int flag;
+
+    // Unable to open directory stream
+    if (!dir)
+    {
+        return;
+    }
+
+    while ((dent = readdir(dir)) != NULL)
+    {
+        if (strcmp(dent->d_name, ".") != 0 && strcmp(dent->d_name, "..") != 0)
+        {
+            stat(dent->d_name, &st);
+            if ( S_ISREG(st.st_mode) )
+            {
+
+    
+                char path[1000];
+                getcwd(path, 1000); 
+                strcat(path, "/");
+                strcat(path, dent->d_name);
+    
+                /* Try to open file */
+                fptr = fopen(dent->d_name, "r");
+            
+                /* Exit if file not opened successfully */
+                if (fptr == NULL)
+                {
+                    continue;
+                }
+            
+            
+                // Find index of word in fptr
+                findStr(fptr, filename, &flag, found);
+            
+                if (flag != -1)
+                {
+                    strcat(reportWIP2, filename);
+                    strcat(reportWIP2,"is found at");
+                    strcat(reportWIP2, path);
+                    strcat(reportWIP2,"\n");
+                }      
+            
+                // Close file
+                fclose(fptr);
+            
+            }
+
+            // Construct new path from our base path
+            strcpy(path, basePath);
+            strcat(path, "/");
+            strcat(path, dent->d_name);
+
+            findTextRecursively(path, filename, reportWIP2, found, first);
+        }
+    }
+
+    closedir(dir);
 }
 
 int main()
@@ -515,7 +584,7 @@ int main()
                 
 
         }
-        
+        //FIND FILE RECURSIVELY
         else if ( get_argument(input, 0, arg0) == 1 && 
                   get_argument(input, 1, arg1) == 1 &&
                   get_argument(input, 2, arg2) == 1 &&
@@ -586,6 +655,78 @@ int main()
                 return 0;
                 }
         }
+        //FIND TEXT RECURSIVELY
+        else if ( get_argument(input, 0, arg0) == 1 && 
+                  get_argument(input, 1, arg1) == 1 &&
+                  get_argument(input, 2, arg2) == 1 &&
+                  get_argument(input, 3, arg3) == 0 &&
+                  strcmp(arg0,"find") == 0 &&
+                  arg1[0] == '\"' && arg1[strlen(arg1)-1] == '\"' &&
+                  strcmp(arg2, "-s") == 0)
+        //else if (strncmp(input,"finr",4) == 0)
+        {
+            int len = strlen(arg1);
+            memmove(arg1, arg1 + 1, len - 2);
+            arg1[len-2] = 0;
+            
+            //int sleepcount = input[5]-48; //ASCII conversion
+            if (fork() == 0) //child process
+                {
+                struct timeval tval_before, tval_after, tval_result;
+                gettimeofday(&tval_before, NULL);
+
+                char reportWIP[10000];
+                char reportWIP2[10000];
+                char childreport[10000];
+                char mystring[10000];
+                char* mybuffer = mystring;
+                getcwd(mybuffer, 10000);
+                int found = 0; 
+                int first = 1; 
+
+                char* filename = arg1; //TO DELETE
+
+                //search for an empty spot in the child list
+                int kidnum=0;
+                for(int i=0;i<10;i++) if(childpids[i]==0) {childpids[i]=getpid();kidnum=i; strcpy(childoccupations[kidnum], input); break;}
+                //printf("kid %d sleeps for %d seconds to indicate a search\n",kidnum,sleepcount);
+                //sleep(10);
+
+                sprintf(reportWIP2,"\n\nkid %d is reporting!\n",kidnum);
+                
+                //finding stuff here...
+                findTextRecursively(mybuffer, filename, reportWIP2, &found, ((int *)(&first))); //change "aba.out"
+                
+                //finding done.
+                if (found != 1)
+                {
+                    strcat(reportWIP2, ">File not found<\n");
+                }
+
+
+                gettimeofday(&tval_after, NULL);
+                timersub(&tval_after, &tval_before, &tval_result);
+                int sec, h, m, s;
+                sec = tval_result.tv_sec;
+                h = (sec/3600); 
+                m = (sec -(3600*h))/60;
+                s = (sec -(3600*h)-(m*60));
+
+                char time_taken[1000];
+                sprintf(time_taken,"Time taken: %i:%i:%i:%ld", h, m, s, (long int)tval_result.tv_usec/1000);
+                strcat(time_taken, "\n\0");
+                strcat(reportWIP2, time_taken);
+            
+                close(fd[0]); //close read    
+                strcpy(childreport, reportWIP2);        
+                write(fd[1],childreport,strlen(childreport));
+                close(fd[1]); //close write  
+                kill(parentPid,SIGUSR1);
+               
+                return 0;
+                }
+        }
+
         else if ( get_argument(input, 0, arg0) == 1 && 
                   get_argument(input, 1, arg1) == 0 &&
                   strcmp(arg0,"list") == 0 ) 
